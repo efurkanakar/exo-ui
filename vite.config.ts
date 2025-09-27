@@ -8,6 +8,7 @@ declare const process: {
 }
 
 const fallbackRepositoryPath = typeof packageJson.name === 'string' ? packageJson.name : undefined
+const repositoryPath = process.env.GITHUB_REPOSITORY?.split('/')[1]
 
 // https://vite.dev/config/
 export default defineConfig(({ command }) => {

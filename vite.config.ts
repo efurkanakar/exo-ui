@@ -1,22 +1,18 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-
-import packageJson from './package.json' assert { type: 'json' }
-
-declare const process: {
-  env: Record<string, string | undefined>
-}
-
-const fallbackRepositoryPath = typeof packageJson.name === 'string' ? packageJson.name : undefined
-const repositoryPath = process.env.GITHUB_REPOSITORY?.split('/')[1]
+import pkg from './package.json' assert { type: 'json' }
 
 // https://vite.dev/config/
 export default defineConfig(({ command }) => {
-  const repositoryPath =
+  const fallbackRepositoryPath =
+    typeof pkg.name === 'string' ? pkg.name : undefined
+
+  const repo =
     process.env.GITHUB_REPOSITORY?.split('/')?.[1] ?? fallbackRepositoryPath
 
   return {
-    base: command === 'serve' ? '/' : repositoryPath ? `/${repositoryPath}/` : '/',
+    base: command === 'serve' ? '/' : repo ? `/${repo}/` : '/',
     plugins: [react()],
   }
 })
+

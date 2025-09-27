@@ -71,6 +71,13 @@ pnpm preview
 
 Build artefacts output to `dist/` and can be served by any static host or reverse proxy configured to forward API calls to the backend.
 
+### GitHub Pages Deployment
+
+- Push the repository to GitHub and enable **GitHub Pages** for the `gh-pages` branch in the repository settings ("Pages" section).
+- The included [`deploy.yml`](.github/workflows/deploy.yml) workflow runs on every push to `main` (or via the "Run workflow" button). It performs `pnpm install`, `pnpm build`, and publishes the generated `dist/` folder to the `gh-pages` branch using [`peaceiris/actions-gh-pages`](https://github.com/peaceiris/actions-gh-pages).
+- On the first run, the workflow creates the `gh-pages` branch automatically (`force_orphan: true`). Subsequent runs overwrite it with the latest production bundle.
+- Local builds (`pnpm build`) remain available in `dist/` if you prefer to deploy manually.
+
 ## Application Structure
 
 ```

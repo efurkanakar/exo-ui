@@ -24,8 +24,15 @@ Modern front-end for the Exoplanet catalogue service. The application gives oper
 ### Prerequisites
 
 - Node.js 20+
-- pnpm 9+
+- pnpm 9+ (via [Corepack](https://nodejs.org/docs/latest/api/corepack.html))
 - Running instance of the Exoplanet FastAPI backend (or an accessible deployment URL)
+
+> Enable Corepack once per environment so the matching pnpm version is downloaded automatically:
+>
+> ```bash
+> corepack enable
+> corepack prepare pnpm@9.15.4 --activate
+> ```
 
 ### Install
 

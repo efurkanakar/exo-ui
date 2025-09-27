@@ -413,6 +413,18 @@ function RecentActivityCard({
             const changeCount = entry.changes?.length ?? 0;
             const hasChanges = changeCount > 0;
             const entryLabel = entry.type === "created" ? "Created" : entry.type === "updated" ? "Updated" : "Deleted";
+            const hasDiffDetails = entry.changes?.some((change) => {
+              if (change.before === change.after) return false;
+              if (change.before === null || typeof change.before === "undefined") return false;
+              return true;
+            });
+            const changeSummary = entry.type === "updated"
+              ? hasDiffDetails
+                ? `${changeCount} ${changeCount === 1 ? "field" : "fields"} changed`
+                : "Changed fields"
+              : entry.type === "created"
+              ? "Captured attributes"
+              : "Recorded attributes";
 
             return (
               <li key={`${entry.type}-${entry.id}-${entry.at}`} style={activityItem}>
@@ -426,13 +438,7 @@ function RecentActivityCard({
                 </div>
                 {hasChanges ? (
                   <div style={activityChanges}>
-                    <span style={activityChangesTitle}>
-                      {entry.type === "updated"
-                        ? `${changeCount} ${changeCount === 1 ? "field" : "fields"} changed`
-                        : entry.type === "created"
-                        ? "Captured attributes"
-                        : "Recorded attributes"}
-                    </span>
+                    <span style={activityChangesTitle}>{changeSummary}</span>
                     <div style={{ overflowX: "auto" }}>
                       <table style={activityChangesTable}>
                         <thead>

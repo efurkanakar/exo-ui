@@ -208,6 +208,7 @@ async function fetchRecentActivity(limit: number): Promise<RecentActivityEntry[]
   const adminKey = (import.meta.env.VITE_ADMIN_API_KEY ?? "").trim();
   const MAX_API_LIMIT = 200;
   const recentLimit = Math.min(Math.max(limit * 4, limit), MAX_API_LIMIT);
+  const previousSnapshots = new Map(fallbackSnapshots);
 
   try {
     const [changeLogs, recentResponse, deletedRows] = await Promise.all([
@@ -244,6 +245,7 @@ async function fetchRecentActivity(limit: number): Promise<RecentActivityEntry[]
       .slice(0, limit);
 
     if (entries.length > 0) {
+      refreshSnapshotCache(recentResponse.items ?? [], deletedRows);
       return entries;
     }
   } catch (error) {
@@ -280,6 +282,13 @@ async function fetchRecentActivity(limit: number): Promise<RecentActivityEntry[]
       st_teff: planet.st_teff,
       st_rad: planet.st_rad,
       st_mass: planet.st_mass,
+      changes: Array.isArray(planet.changes) && planet.changes.length > 0
+        ? planet.changes
+        : buildSnapshotChanges(
+            extractSnapshot(planet),
+            "created",
+            previousSnapshots.get(planet.id),
+          ),
     }));
 
   const deletedEntries: RecentActivityEntry[] = deletedRows
@@ -291,6 +300,11 @@ async function fetchRecentActivity(limit: number): Promise<RecentActivityEntry[]
       at: row.deleted_at!,
       method: row.disc_method,
       disc_year: row.disc_year,
+      changes: buildSnapshotChanges(
+        extractSnapshot(row),
+        "deleted",
+        previousSnapshots.get(row.id),
+      ),
     }));
 
   const updatedEntries: RecentActivityEntry[] = recentItems
@@ -308,13 +322,112 @@ async function fetchRecentActivity(limit: number): Promise<RecentActivityEntry[]
       st_teff: planet.st_teff,
       st_rad: planet.st_rad,
       st_mass: planet.st_mass,
+      changes: Array.isArray(planet.changes) && planet.changes.length > 0
+        ? planet.changes
+        : buildSnapshotChanges(
+            extractSnapshot(planet),
+            "updated",
+            previousSnapshots.get(planet.id),
+          ),
     }));
 
   const combined = [...createdEntries, ...deletedEntries, ...updatedEntries]
     .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
     .slice(0, limit);
 
+  refreshSnapshotCache(recentItems, deletedRows);
   return combined;
+}
+
+const SNAPSHOT_FIELDS = [
+  "name",
+  "disc_method",
+  "disc_year",
+  "orbperd",
+  "rade",
+  "masse",
+  "st_teff",
+  "st_rad",
+  "st_mass",
+  "created_at",
+  "updated_at",
+  "deleted_at",
+  "is_deleted",
+] as const;
+
+type SnapshotField = (typeof SNAPSHOT_FIELDS)[number];
+type PlanetSnapshot = Partial<Record<SnapshotField, unknown>>;
+
+const fallbackSnapshots = new Map<number, PlanetSnapshot>();
+
+function extractSnapshot(source: Partial<Planet> | DeletedPlanetOut): PlanetSnapshot {
+  const snapshot: PlanetSnapshot = {};
+  const record = source as Record<string, unknown>;
+  for (const field of SNAPSHOT_FIELDS) {
+    if (field in record) {
+      snapshot[field] = record[field];
+    }
+  }
+  return snapshot;
+}
+
+function valuesEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if ((a === null || typeof a === "undefined") && (b === null || typeof b === "undefined")) {
+    return true;
+  }
+  if (typeof a === "number" && typeof b === "number") {
+    return Number.isNaN(a) && Number.isNaN(b);
+  }
+  return false;
+}
+
+function buildSnapshotChanges(
+  current: PlanetSnapshot,
+  mode: "created" | "deleted" | "updated",
+  previous?: PlanetSnapshot,
+): PlanetChangeEntry[] | undefined {
+  const entries: PlanetChangeEntry[] = [];
+
+  for (const field of SNAPSHOT_FIELDS) {
+    const before = previous?.[field];
+    const after = current[field];
+
+    if (mode === "created") {
+      if (after === undefined || after === null) continue;
+      if (typeof after === "string" && after.trim() === "") continue;
+      entries.push({ field, before: null, after });
+      continue;
+    }
+
+    if (mode === "deleted") {
+      const value = before ?? after;
+      if (value === undefined || value === null) continue;
+      if (typeof value === "string" && value.trim() === "") continue;
+      entries.push({ field, before: value, after: null });
+      continue;
+    }
+
+    if (mode === "updated") {
+      if (!previous) continue;
+      if (valuesEqual(before, after)) continue;
+      entries.push({ field, before: before ?? null, after: after ?? null });
+    }
+  }
+
+  return entries.length > 0 ? entries : undefined;
+}
+
+function refreshSnapshotCache(recentItems: Planet[], deletedRows: DeletedPlanetOut[]) {
+  for (const planet of recentItems) {
+    fallbackSnapshots.set(planet.id, extractSnapshot(planet));
+  }
+
+  for (const row of deletedRows) {
+    const snapshot = extractSnapshot(row);
+    snapshot.is_deleted = true;
+    fallbackSnapshots.set(row.id, snapshot);
+  }
 }
 
 function convertChangeLogToActivity(

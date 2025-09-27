@@ -25,19 +25,22 @@ const queryClient = new QueryClient({
   },
 });
 
-const router = createBrowserRouter([
-  {
-    path: "/",
-    element: <App />,
-    children: [
-      { index: true, element: <DashboardPage /> },    // ← Dashboard is the home
-      { path: "planets", element: <PlanetsPage /> },
-      { path: "visualization", element: <VisualizationPage /> },
-      { path: "diagnostics", element: <DiagnosticsPage /> },
-      { path: "admin/deleted", element: <AdminDeletedPage /> },
-    ],
-  },
-]);
+const router = createBrowserRouter(
+  [
+    {
+      path: "/",
+      element: <App />,
+      children: [
+        { index: true, element: <DashboardPage /> },    // ← Dashboard is the home
+        { path: "planets", element: <PlanetsPage /> },
+        { path: "visualization", element: <VisualizationPage /> },
+        { path: "diagnostics", element: <DiagnosticsPage /> },
+        { path: "admin/deleted", element: <AdminDeletedPage /> },
+      ],
+    },
+  ],
+  { basename: import.meta.env.BASE_URL }
+);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

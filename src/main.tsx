@@ -1,7 +1,8 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
+//import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import { createHashRouter, RouterProvider } from "react-router-dom";
 
 import "./index.css";
 
@@ -25,7 +26,8 @@ const queryClient = new QueryClient({
   },
 });
 
-const router = createBrowserRouter(
+//const router = createBrowserRouter(
+const router = createHashRouter(
   [
     {
       path: "/",
@@ -39,7 +41,7 @@ const router = createBrowserRouter(
       ],
     },
   ],
-  { basename: import.meta.env.BASE_URL }
+  //{ basename: import.meta.env.BASE_URL }
 );
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

@@ -7,8 +7,13 @@ export default defineConfig(({ command }) => {
   const fallbackRepositoryPath =
     typeof pkg.name === 'string' ? pkg.name : undefined
 
+  const { process: nodeProcess } = globalThis as typeof globalThis & {
+    process?: { env?: Record<string, string | undefined> }
+  }
+
   const repo =
-    process.env.GITHUB_REPOSITORY?.split('/')?.[1] ?? fallbackRepositoryPath
+    nodeProcess?.env?.GITHUB_REPOSITORY?.split('/')?.[1] ??
+    fallbackRepositoryPath
 
   return {
     base: command === 'serve' ? '/' : repo ? `/${repo}/` : '/',

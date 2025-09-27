@@ -1,4 +1,6 @@
 import React from "react";
+console.log("API_URL =", import.meta.env.VITE_API_URL);
+
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createHashRouter, RouterProvider } from "react-router-dom";

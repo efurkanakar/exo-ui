@@ -32,6 +32,7 @@ jobs:
           version: 9
           standalone: true
 
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 

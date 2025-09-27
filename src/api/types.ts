@@ -46,6 +46,7 @@ export interface PlanetChangeLogEntry {
   id: number;
   planet_id: number;
   action: "create" | "update" | "delete";
+  planet_name?: string;
   changes: PlanetChangeEntry[];
   created_at: string;
 }

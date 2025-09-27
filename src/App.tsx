@@ -1,12 +1,22 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 
-const NAV_LINKS = [
-  { to: "/", label: "Dashboard", end: true },
-  { to: "/planets", label: "Planets" },
-  { to: "/visualization", label: "Visualization" },
-  { to: "/diagnostics", label: "Diagnostics" },
-  { to: "/admin/deleted", label: "Admin" },
+const NAV_SECTIONS = [
+  {
+    title: "Monitoring",
+    items: [
+      { to: "/", label: "Dashboard", end: true },
+      { to: "/planets", label: "Planets" },
+      { to: "/visualization", label: "Visualization" },
+    ],
+  },
+  {
+    title: "Operations",
+    items: [
+      { to: "/diagnostics", label: "Diagnostics" },
+      { to: "/admin/deleted", label: "Admin" },
+    ],
+  },
 ];
 
 const THEME_STORAGE_KEY = "exo-ui-theme" as const;
@@ -55,19 +65,29 @@ export default function App() {
   return (
     <div className="app-shell">
       <aside className="app-sidebar">
-        <strong className="app-brand">🪐 Exo UI</strong>
-        <nav className="app-tabs">
-          {NAV_LINKS.map(({ to, label, end }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              className={({ isActive }) =>
-                isActive ? "app-tab app-tab--active" : "app-tab"
-              }
-            >
-              {label}
-            </NavLink>
+        <div className="app-brand">
+          <span className="app-brand__title">Exoplanet Console</span>
+          <span className="app-brand__subtitle">Analytics & Ops</span>
+        </div>
+        <nav className="app-sections">
+          {NAV_SECTIONS.map((section) => (
+            <div key={section.title} className="app-section">
+              <span className="app-section__title">{section.title}</span>
+              <div className="app-tabs">
+                {section.items.map(({ to, label, end }) => (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    end={end}
+                    className={({ isActive }) =>
+                      isActive ? "app-tab app-tab--active" : "app-tab"
+                    }
+                  >
+                    {label}
+                  </NavLink>
+                ))}
+              </div>
+            </div>
           ))}
         </nav>
         <div className="app-sidebar-footer">

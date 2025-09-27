@@ -186,6 +186,13 @@ export interface RecentActivityEntry {
   type: RecentActivityType;
   at: string;
   method?: string | null;
+  disc_year?: number | null;
+  orbperd?: number | null;
+  rade?: number | null;
+  masse?: number | null;
+  st_teff?: number | null;
+  st_rad?: number | null;
+  st_mass?: number | null;
   changes?: PlanetChangeEntry[];
 }
 
@@ -199,7 +206,8 @@ export function useRecentActivity(limit = 6) {
 
 async function fetchRecentActivity(limit: number): Promise<RecentActivityEntry[]> {
   const adminKey = (import.meta.env.VITE_ADMIN_API_KEY ?? "").trim();
-  const recentLimit = Math.max(limit * 4, limit);
+  const MAX_API_LIMIT = 200;
+  const recentLimit = Math.min(Math.max(limit * 4, limit), MAX_API_LIMIT);
 
   try {
     const [changeLogs, recentResponse, deletedRows] = await Promise.all([
@@ -215,12 +223,18 @@ async function fetchRecentActivity(limit: number): Promise<RecentActivityEntry[]
         : Promise.resolve<DeletedPlanetOut[]>([]),
     ]);
 
-    const planetLookup = new Map<number, { name?: string | null; method?: string | null }>();
+    const planetLookup = new Map<number, Partial<Planet>>();
     (recentResponse.items ?? []).forEach((planet) => {
-      planetLookup.set(planet.id, { name: planet.name, method: planet.disc_method });
+      planetLookup.set(planet.id, planet);
     });
     deletedRows.forEach((row) => {
-      planetLookup.set(row.id, { name: row.name, method: row.disc_method });
+      planetLookup.set(row.id, {
+        id: row.id,
+        name: row.name,
+        disc_method: row.disc_method,
+        disc_year: row.disc_year,
+        deleted_at: row.deleted_at,
+      });
     });
 
     const entries = changeLogs
@@ -259,6 +273,13 @@ async function fetchRecentActivity(limit: number): Promise<RecentActivityEntry[]
       type: "created" as const,
       at: planet.created_at!,
       method: planet.disc_method,
+      disc_year: planet.disc_year,
+      orbperd: planet.orbperd,
+      rade: planet.rade,
+      masse: planet.masse,
+      st_teff: planet.st_teff,
+      st_rad: planet.st_rad,
+      st_mass: planet.st_mass,
     }));
 
   const deletedEntries: RecentActivityEntry[] = deletedRows
@@ -269,6 +290,7 @@ async function fetchRecentActivity(limit: number): Promise<RecentActivityEntry[]
       type: "deleted" as const,
       at: row.deleted_at!,
       method: row.disc_method,
+      disc_year: row.disc_year,
     }));
 
   const updatedEntries: RecentActivityEntry[] = recentItems
@@ -279,6 +301,13 @@ async function fetchRecentActivity(limit: number): Promise<RecentActivityEntry[]
       type: "updated" as const,
       at: planet.updated_at!,
       method: planet.disc_method,
+      disc_year: planet.disc_year,
+      orbperd: planet.orbperd,
+      rade: planet.rade,
+      masse: planet.masse,
+      st_teff: planet.st_teff,
+      st_rad: planet.st_rad,
+      st_mass: planet.st_mass,
     }));
 
   const combined = [...createdEntries, ...deletedEntries, ...updatedEntries]
@@ -290,7 +319,7 @@ async function fetchRecentActivity(limit: number): Promise<RecentActivityEntry[]
 
 function convertChangeLogToActivity(
   log: PlanetChangeLogEntry,
-  planetLookup: Map<number, { name?: string | null; method?: string | null }>,
+  planetLookup: Map<number, Partial<Planet>>,
 ): RecentActivityEntry | null {
   const type: RecentActivityType = log.action === "update"
     ? "updated"
@@ -298,12 +327,28 @@ function convertChangeLogToActivity(
     ? "deleted"
     : "created";
 
-  const info = planetLookup.get(log.planet_id);
-  const nameChange = findChange(log.changes, "name");
-  const methodChange = findChange(log.changes, "disc_method");
+  const info = planetLookup.get(log.planet_id) ?? {};
+  const changeSet = log.changes ?? [];
+  const nameChange = findChange(changeSet, "name");
+  const methodChange = findChange(changeSet, "disc_method");
 
-  const name = (nameChange?.after ?? nameChange?.before ?? info?.name ?? `Planet #${log.planet_id}`) as string;
-  const method = (methodChange?.after ?? methodChange?.before ?? info?.method ?? null) as string | null;
+  const name = (nameChange?.after
+    ?? nameChange?.before
+    ?? info.name
+    ?? log.planet_name
+    ?? `Planet #${log.planet_id}`) as string;
+  const method = (methodChange?.after ?? methodChange?.before ?? info.disc_method ?? null) as string | null;
+
+  const snapshotValue = (field: keyof Planet): unknown => {
+    const change = findChange(changeSet, field as string);
+    if (change) {
+      if (type === "deleted") {
+        return change.before ?? (info as Record<string, unknown>)[field];
+      }
+      return change.after ?? change.before ?? (info as Record<string, unknown>)[field];
+    }
+    return (info as Record<string, unknown>)[field];
+  };
 
   return {
     id: log.planet_id,
@@ -311,7 +356,14 @@ function convertChangeLogToActivity(
     type,
     at: log.created_at,
     method,
-    changes: log.changes,
+    changes: changeSet,
+    disc_year: snapshotValue("disc_year") as number | null | undefined,
+    orbperd: snapshotValue("orbperd") as number | null | undefined,
+    rade: snapshotValue("rade") as number | null | undefined,
+    masse: snapshotValue("masse") as number | null | undefined,
+    st_teff: snapshotValue("st_teff") as number | null | undefined,
+    st_rad: snapshotValue("st_rad") as number | null | undefined,
+    st_mass: snapshotValue("st_mass") as number | null | undefined,
   };
 }
 

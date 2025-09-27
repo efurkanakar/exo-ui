@@ -9,39 +9,35 @@ import {
   type RecentActivityEntry,
   type RecentActivityType,
 } from "../hooks/usePlanets";
-import type { MethodCount } from "../api/types";
-
-/**
- * Dashboard (polished + precision control)
- * - KPI: total planets
- * - "By Discovery Method" tablosu (arama + sıralama)
- * - Method seçimiyle detay istatistik grid (min/max/avg/median)
- * - Precision seçici (ondalık sayısı) — varsayılan 2
- * - Profesyonel görünüm: header aksiyonları, badge'ler, tutarlı boşluklar,
- *   yükleme iskeletleri, hata ve boş durumları
- */
+import type { MethodCount } from "../api/types";""
 
 type SortKey = "count" | "name";
+
+const MAX_ACTIVITY_LIMIT = 200;
+const ACTIVITY_LIMIT_OPTIONS = [1, 5, 25, 50, 100, "all"] as const;
+type ActivityLimitOption = (typeof ACTIVITY_LIMIT_OPTIONS)[number];
 
 export default function DashboardPage() {
   const { data: count } = usePlanetCount();
   const { data: methods, isLoading: methodsLoading, isError: methodsError, error: methodsErr } = useMethodCounts();
   const timeline = useTimeline({});
 
-  // UX: arama + sıralama
   const [query, setQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortKey>("count");
 
-  // Detay istatistik için seçilen method
   const defaultMethod = "Transit";
   const [selectedMethod, setSelectedMethod] = useState<string>("");
   const hasAlignedDefault = useRef(false);
 
-  // Precision kontrolü (.2f gibi) — varsayılan 2
   const [digits, setDigits] = useState<number>(2);
 
   const methodStatQuery = useMethodStats(selectedMethod || undefined);
-  const recentActivity = useRecentActivity(6);
+  const [activityLimitOption, setActivityLimitOption] = useState<ActivityLimitOption>(1);
+  const activityLimit = useMemo(
+    () => (activityLimitOption === "all" ? MAX_ACTIVITY_LIMIT : activityLimitOption),
+    [activityLimitOption]
+  );
+  const recentActivity = useRecentActivity(activityLimit);
 
   const firstObservationYear = useMemo(() => {
     const points = timeline.data ?? [];
@@ -88,20 +84,19 @@ export default function DashboardPage() {
     setSelectedMethod(value);
   };
 
-  // Filtrelenmiş + sıralanmış method listesi
   const filtered: MethodCount[] = useMemo(() => {
     const arr = (methods ?? []).slice();
-    // arama
+
     const term = query.trim().toLowerCase();
     const q = term ? arr.filter((m) => (m.disc_method ?? "unknown").toLowerCase().includes(term)) : arr;
-    // sıralama
+
     q.sort((a, b) => {
       if (sortBy === "name") {
         const an = (a.disc_method ?? "Unknown").toLowerCase();
         const bn = (b.disc_method ?? "Unknown").toLowerCase();
         return an.localeCompare(bn);
       }
-      // count desc
+
       return (b.count ?? 0) - (a.count ?? 0);
     });
     return q;
@@ -334,6 +329,8 @@ export default function DashboardPage() {
         isLoading={recentActivity.isLoading}
         isError={recentActivity.isError}
         error={recentActivity.error}
+        limitOption={activityLimitOption}
+        onChangeLimit={setActivityLimitOption}
       />
     </section>
   );
@@ -368,7 +365,7 @@ function HeroPanel({
         <span style={heroEyebrow}>Exploration overview</span>
         <h1 style={heroTitle}>Exoplanet Dashboard</h1>
         <p style={heroSubtitle}>
-          Stay on top of discovery performance and dig into method-level telemetry in a single glance.
+          Monitor catalogue scale, compare discovery methods, and inspect recent planet updates from a single workspace.
         </p>
       </div>
 
@@ -388,17 +385,22 @@ function RecentActivityCard({
   isLoading,
   isError,
   error,
+  limitOption,
+  onChangeLimit,
 }: {
   items: RecentActivityEntry[] | undefined;
   isLoading: boolean;
   isError: boolean;
   error: unknown;
+  limitOption: ActivityLimitOption;
+  onChangeLimit: (value: ActivityLimitOption) => void;
 }) {
   return (
     <div className="card interactive-card" style={{ ...surfaceCard, padding: 24 }}>
       <CardHeader
         title="Recent changes"
         subtitle="Latest catalogue activity (UTC)"
+        trailing={<RecentActivityLimitPicker value={limitOption} onChange={onChangeLimit} />}
       />
       {isLoading && <InlineLoader text="Loading recent changes…" />}
       {isError && <ErrorNote error={error as Error} />}
@@ -407,39 +409,57 @@ function RecentActivityCard({
       )}
       {!isLoading && !isError && items && items.length > 0 && (
         <ul style={activityList}>
-          {items.map((entry) => (
-            <li key={`${entry.type}-${entry.id}-${entry.at}`} style={activityItem}>
-              <div style={activityHeader}>
-                <span style={activityBadge(entry.type)}>
-                  {entry.type === "created"
-                    ? "Created"
-                    : entry.type === "updated"
-                    ? "Updated"
-                    : "Deleted"}
-                </span>
-              </div>
-              <div style={activityBody}>
-                <strong>#{entry.id}</strong>
-                <span>{entry.name || "Unknown"}</span>
-              </div>
-              <div style={activityMeta}>
-                <span>{activityTimestampLabel(entry.type)}: {formatUtc(entry.at)}</span>
-                {entry.method && <span>Method: {entry.method}</span>}
-              </div>
-              {entry.changes && entry.changes.length > 0 && (
-                <div style={activityChanges}>
-                  <span style={activityChangesTitle}>Changes:</span>
-                  <ul style={activityChangesList}>
-                    {entry.changes.map((change, idx) => (
-                      <li key={`${entry.id}-${entry.at}-${change.field}-${idx}`} style={activityChangeItem}>
-                        <code>{change.field}</code>: {formatChangeValue(change.before)} → {formatChangeValue(change.after)}
-                      </li>
-                    ))}
-                  </ul>
+          {items.map((entry) => {
+            const changeCount = entry.changes?.length ?? 0;
+            const hasChanges = changeCount > 0;
+            const entryLabel = entry.type === "created" ? "Created" : entry.type === "updated" ? "Updated" : "Deleted";
+
+            return (
+              <li key={`${entry.type}-${entry.id}-${entry.at}`} style={activityItem}>
+                <div style={activityHeader}>
+                  <span style={activityBadge(entry.type)}>{entryLabel}</span>
+                  <span style={activityTimestamp}>{formatUtc(entry.at)}</span>
                 </div>
-              )}
-            </li>
-          ))}
+                <div style={activityBody}>
+                  <strong>#{entry.id}</strong>
+                  <span>{entry.name || "Unknown"}</span>
+                </div>
+                {hasChanges ? (
+                  <div style={activityChanges}>
+                    <span style={activityChangesTitle}>
+                      {entry.type === "updated"
+                        ? `${changeCount} ${changeCount === 1 ? "field" : "fields"} changed`
+                        : entry.type === "created"
+                        ? "Captured attributes"
+                        : "Recorded attributes"}
+                    </span>
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={activityChangesTable}>
+                        <thead>
+                          <tr>
+                            <th style={activityChangesHeaderCell}>Field</th>
+                            <th style={activityChangesHeaderCellNumeric}>Before</th>
+                            <th style={activityChangesHeaderCellNumeric}>After</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {entry.changes?.map((change, idx) => (
+                            <tr key={`${entry.id}-${entry.at}-${change.field}-${idx}`}>
+                              <td style={activityChangesFieldCell}>{getFieldLabel(change.field)}</td>
+                              <td style={activityChangesValueCell}>{formatValueForField(change.field, change.before)}</td>
+                              <td style={activityChangesValueCell}>{formatValueForField(change.field, change.after)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={activityNoChanges}>No change details available.</div>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
@@ -452,6 +472,94 @@ function formatUtc(value: string) {
   } catch {
     return value;
   }
+}
+
+interface FieldMeta {
+  label: string;
+  unit?: string;
+  digits?: number;
+}
+
+const FIELD_META: Record<string, FieldMeta> = {
+  name: { label: "Name" },
+  disc_method: { label: "Discovery Method" },
+  disc_year: { label: "Discovery Year", digits: 0 },
+  orbperd: { label: "Orbital Period", unit: "days", digits: 3 },
+  rade: { label: "Radius", unit: "R⊕", digits: 3 },
+  masse: { label: "Mass", unit: "M⊕", digits: 3 },
+  st_teff: { label: "Star Eff. Temp", unit: "K", digits: 0 },
+  st_rad: { label: "Star Radius", unit: "R☉", digits: 3 },
+  st_mass: { label: "Star Mass", unit: "M☉", digits: 3 },
+  created_at: { label: "Created at" },
+  updated_at: { label: "Updated at" },
+  deleted_at: { label: "Deleted at" },
+  is_deleted: { label: "Deleted" },
+};
+
+function getFieldLabel(field: string): string {
+  const meta = FIELD_META[field];
+  if (meta?.label) return meta.label;
+  return toTitleCase(field.replace(/_/g, " "));
+}
+
+function formatValueForField(field: string, value: unknown): string {
+  if (value === null || typeof value === "undefined") return "—";
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return formatNumericField(field, value, { withUnit: true });
+  }
+  if (typeof value === "boolean") {
+    return value ? "Yes" : "No";
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return "—";
+    if (field.endsWith("_at") || looksLikeIsoTimestamp(trimmed)) {
+      return formatUtc(trimmed);
+    }
+    return trimmed;
+  }
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
+  }
+  return String(value);
+}
+
+function formatNumericField(
+  field: string,
+  value: number,
+  opts: { withUnit?: boolean; sign?: boolean } = {},
+): string {
+  if (!Number.isFinite(value)) return "—";
+
+  const meta = FIELD_META[field];
+  const digits = Math.max(0, Math.min(6, meta?.digits ?? 4));
+  const formatter = new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: digits,
+    minimumFractionDigits: 0,
+    signDisplay: opts.sign ? "exceptZero" : "auto",
+  });
+
+  const formatted = formatter.format(value);
+  if (opts.withUnit && meta?.unit) {
+    return `${formatted} ${meta.unit}`;
+  }
+  return formatted;
+}
+
+function looksLikeIsoTimestamp(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}T/.test(value);
+}
+
+function toTitleCase(value: string): string {
+  return value
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function HeroMetric({ label, value }: { label: string; value: React.ReactNode }) {
@@ -522,6 +630,47 @@ function CardHeader({
       </div>
       {trailing}
     </div>
+  );
+}
+
+function RecentActivityLimitPicker({
+  value,
+  onChange,
+}: {
+  value: ActivityLimitOption;
+  onChange: (value: ActivityLimitOption) => void;
+}) {
+  return (
+    <label
+      className="muted"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        fontSize: 12,
+      }}
+    >
+      Showing:
+      <span style={{ ...selectWrapper, minWidth: 110 }}>
+        <select
+          value={String(value)}
+          onChange={(event) => {
+            const raw = event.target.value;
+            const next = raw === "all" ? "all" : (Number(raw) as ActivityLimitOption);
+            onChange(next);
+          }}
+          style={{ ...selectControl, minWidth: 110 }}
+          aria-label="Recent activity entry count"
+        >
+          {ACTIVITY_LIMIT_OPTIONS.map((option) => (
+            <option key={String(option)} value={String(option)}>
+              {option === "all" ? "All" : option}
+            </option>
+          ))}
+        </select>
+        <SelectChevron />
+      </span>
+    </label>
   );
 }
 
@@ -664,29 +813,6 @@ function StatRow({
       <td style={centerCell}>{fmt(s?.median, digits)}</td>
     </tr>
   );
-}
-
-function activityTimestampLabel(type: RecentActivityType) {
-  switch (type) {
-    case "created":
-      return "Created at";
-    case "updated":
-      return "Updated at";
-    case "deleted":
-    default:
-      return "Deleted at";
-  }
-}
-
-function formatChangeValue(value: unknown) {
-  if (value === null || typeof value === "undefined") return "—";
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return new Intl.NumberFormat("en-US", { maximumFractionDigits: 4 }).format(value);
-  }
-  if (typeof value === "object") {
-    return JSON.stringify(value);
-  }
-  return String(value);
 }
 
 /* ===================== Helpers & Styles ===================== */
@@ -936,6 +1062,12 @@ const activityHeader: React.CSSProperties = {
   gap: 12,
 };
 
+const activityTimestamp: React.CSSProperties = {
+  fontSize: 12,
+  color: "var(--color-text-secondary)",
+  fontVariantNumeric: "tabular-nums",
+};
+
 const badgeBase: React.CSSProperties = {
   padding: "4px 10px",
   borderRadius: 999,
@@ -950,18 +1082,12 @@ const activityBody: React.CSSProperties = {
   alignItems: "center",
   gap: 10,
   fontSize: 14,
-};
-
-const activityMeta: React.CSSProperties = {
-  display: "grid",
-  gap: 4,
-  fontSize: 12,
-  color: "var(--color-text-secondary)",
+  flexWrap: "wrap",
 };
 
 const activityChanges: React.CSSProperties = {
   display: "grid",
-  gap: 4,
+  gap: 8,
   fontSize: 12,
   color: "var(--color-text-muted)",
 };
@@ -970,15 +1096,48 @@ const activityChangesTitle: React.CSSProperties = {
   fontWeight: 600,
 };
 
-const activityChangesList: React.CSSProperties = {
-  margin: 0,
-  paddingLeft: 18,
-  display: "grid",
-  gap: 4,
+const activityChangesTable: React.CSSProperties = {
+  width: "100%",
+  borderCollapse: "collapse",
+  minWidth: 420,
+  tableLayout: "fixed",
 };
 
-const activityChangeItem: React.CSSProperties = {
-  listStyle: "disc",
+const activityChangesHeaderCell: React.CSSProperties = {
+  textAlign: "left",
+  padding: "8px",
+  fontSize: 11,
+  letterSpacing: 0.4,
+  textTransform: "uppercase",
+  color: "var(--color-text-muted)",
+  borderBottom: "1px solid var(--surface-card-border)",
+  width: "40%",
+};
+
+const activityChangesHeaderCellNumeric: React.CSSProperties = {
+  ...activityChangesHeaderCell,
+  textAlign: "right",
+  width: "30%",
+};
+
+const activityChangesFieldCell: React.CSSProperties = {
+  padding: "10px 8px",
+  borderBottom: "1px solid var(--surface-card-border)",
+  whiteSpace: "nowrap",
+  width: "40%",
+};
+
+const activityChangesValueCell: React.CSSProperties = {
+  padding: "10px 8px",
+  borderBottom: "1px solid var(--surface-card-border)",
+  textAlign: "right",
+  fontVariantNumeric: "tabular-nums",
+  width: "30%",
+};
+
+const activityNoChanges: React.CSSProperties = {
+  fontSize: 12,
+  color: "var(--color-text-muted)",
 };
 
 const activityBadgeStyles: Record<RecentActivityType, CSSProperties> = {

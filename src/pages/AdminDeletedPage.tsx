@@ -251,10 +251,10 @@ export default function AdminDeletedPage() {
     <section style={pageWrap}>
       <header style={pageIntro}>
         <div>
-          <h1 style={pageTitle}>Admin: Deleted Catalogue</h1>
+          <h1 style={pageTitle}>Control Page</h1>
           <p style={pageSubtitle}>
-            Review soft-deleted planets, restore records, or escalate to hard delete and full wipe operations.
-            Every admin action requires a valid API key.
+            Manage the catalogue end to end: create new planets, inspect soft-deleted records, restore entries,
+            escalate to hard deletes, or trigger a full wipe. All actions require a valid admin API key.
           </p>
         </div>
         <div style={metaRow}>

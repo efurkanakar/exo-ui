@@ -20,6 +20,8 @@ export default function VisualizationPage() {
   const [chart, setChart] = useState<DiscoveryChartType>("hist");
   const [bins, setBins] = useState<number>(30);
   const [sigma, setSigma] = useState<number>(3);
+  const [binsDraft, setBinsDraft] = useState<string>(() => String(30));
+  const [sigmaDraft, setSigmaDraft] = useState<string>(() => String(3));
   const [previewVersion, setPreviewVersion] = useState(0);
   const isFirstRender = useRef(true);
 
@@ -46,24 +48,47 @@ export default function VisualizationPage() {
     return `${base}${separator}v=${previewVersion}`;
   }, [params, previewVersion]);
 
+  useEffect(() => {
+    setBinsDraft(String(bins));
+  }, [bins]);
+
+  useEffect(() => {
+    setSigmaDraft(String(sigma));
+  }, [sigma]);
+
   const stats = useMemo(() => (dataset ? buildStats(dataset) : []), [dataset]);
 
   const handlePreviewRefresh = () => {
     setPreviewVersion((prev) => prev + 1);
   };
 
-  const handleBinsChange = (value: string) => {
-    const numeric = Number(value);
-    if (Number.isNaN(numeric)) return;
-    const clamped = Math.min(200, Math.max(5, Math.round(numeric)));
-    setBins(clamped);
-  };
+  const normalizeBinsDraft = useMemo(() => {
+    if (!binsDraft.trim()) return null;
+    const parsed = Number(binsDraft);
+    if (!Number.isFinite(parsed)) return null;
+    const rounded = Math.round(parsed);
+    if (!Number.isFinite(rounded)) return null;
+    return Math.min(200, Math.max(5, rounded));
+  }, [binsDraft]);
 
-  const handleSigmaChange = (value: string) => {
-    const numeric = Number(value);
-    if (Number.isNaN(numeric)) return;
-    const clamped = Math.min(10, Math.max(0, numeric));
-    setSigma(Number(clamped.toFixed(1)));
+  const normalizeSigmaDraft = useMemo(() => {
+    if (!sigmaDraft.trim()) return null;
+    const parsed = Number(sigmaDraft);
+    if (!Number.isFinite(parsed)) return null;
+    const clamped = Math.min(10, Math.max(0, parsed));
+    return Number(clamped.toFixed(1));
+  }, [sigmaDraft]);
+
+  const histogramInvalid = chart === "hist" && (normalizeBinsDraft === null || normalizeSigmaDraft === null);
+  const histogramDirty = chart === "hist" && !histogramInvalid && (
+    normalizeBinsDraft !== bins || normalizeSigmaDraft !== sigma
+  );
+
+  const handleApplyHistogram = () => {
+    if (histogramInvalid) return;
+    if (normalizeBinsDraft === null || normalizeSigmaDraft === null) return;
+    setBins(normalizeBinsDraft);
+    setSigma(normalizeSigmaDraft);
   };
 
   return (
@@ -163,15 +188,15 @@ export default function VisualizationPage() {
             </div>
 
             {chart === "hist" && (
-              <div style={paramGrid}>
+              <div style={paramCluster}>
                 <label style={fieldLabel}>
                   Bins (5-200)
                   <input
                     type="number"
                     min={5}
                     max={200}
-                    value={bins}
-                    onChange={(e) => handleBinsChange(e.target.value)}
+                    value={binsDraft}
+                    onChange={(e) => setBinsDraft(e.target.value)}
                     style={inputControl}
                   />
                 </label>
@@ -182,11 +207,28 @@ export default function VisualizationPage() {
                     min={0}
                     max={10}
                     step={0.1}
-                    value={sigma}
-                    onChange={(e) => handleSigmaChange(e.target.value)}
+                    value={sigmaDraft}
+                    onChange={(e) => setSigmaDraft(e.target.value)}
                     style={inputControl}
                   />
                 </label>
+                <div style={paramButtonCell}>
+                  <button
+                    type="button"
+                    onClick={handleApplyHistogram}
+                    style={{
+                      ...primaryButton,
+                      opacity: histogramInvalid || !histogramDirty ? 0.5 : 1,
+                      cursor: histogramInvalid || !histogramDirty ? "not-allowed" : "pointer",
+                    }}
+                    disabled={histogramInvalid || !histogramDirty}
+                  >
+                    Apply
+                  </button>
+                  {histogramInvalid && (
+                    <span style={paramHelperText}>Enter bins 5-200 and sigma 0-10.</span>
+                  )}
+                </div>
               </div>
             )}
 
@@ -467,10 +509,11 @@ const chartToggleButton = (active: boolean): CSSProperties => ({
   width: "100%",
 });
 
-const paramGrid: CSSProperties = {
+const paramCluster: CSSProperties = {
   display: "grid",
   gap: 16,
-  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 220px))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  alignItems: "end",
   marginBottom: 16,
 };
 
@@ -493,6 +536,12 @@ const inputControl: CSSProperties = {
   color: "var(--input-text)",
   background: "var(--input-bg)",
   boxShadow: "var(--input-shadow)",
+};
+
+const paramButtonCell: CSSProperties = {
+  display: "grid",
+  gap: 8,
+  alignContent: "end",
 };
 
 const statsGrid: CSSProperties = {
@@ -578,6 +627,28 @@ const ghostButton: CSSProperties = {
   fontSize: 12,
   fontWeight: 600,
   cursor: "pointer",
+};
+
+const primaryButton: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "10px 16px",
+  borderRadius: 12,
+  border: "none",
+  background: "linear-gradient(135deg, var(--accent-primary), var(--accent-primary-strong))",
+  color: "var(--accent-on-primary)",
+  fontSize: 13,
+  fontWeight: 600,
+  boxShadow: "0 12px 24px -14px rgba(37, 99, 235, 0.65)",
+  transition: "opacity 0.2s ease, transform 0.2s ease",
+  width: "100%",
+  minHeight: 42,
+};
+
+const paramHelperText: CSSProperties = {
+  fontSize: 12,
+  color: "var(--color-text-muted)",
 };
 
 const tableScroll: CSSProperties = {

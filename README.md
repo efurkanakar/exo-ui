@@ -56,8 +56,8 @@ pnpm dev
 ### Type Checking & Linting
 
 ```bash
-pnpm tsc --noEmit   # Strict TypeScript validation
-pnpm lint           # ESLint (type-aware) ruleset
+pnpm tsc --noEmit -p config/tsconfig.app.json   # Strict TypeScript validation
+pnpm lint                                       # ESLint (type-aware) ruleset
 ```
 
 ### Production Build
@@ -81,6 +81,8 @@ src/
   components/    // Shared UI primitives (cards, loaders, tables)
   index.css      // Theme tokens, layout primitives, sidebar styles
   App.tsx        // Shell layout (sidebar navigation, theme toggler)
+config/
+  *.json/.ts     // Centralised TypeScript, ESLint, Vite configuration and cache artefacts
 ```
 
 Routing is provided by React Router (`src/App.tsx`), with left navigation grouped into “Monitoring” and “Operations” sections. Theme preference (light/dark) is persisted via `localStorage` (`exo-ui-theme`).
@@ -94,7 +96,7 @@ Routing is provided by React Router (`src/App.tsx`), with left navigation groupe
 
 ## Testing & Quality Gates
 
-- Use `pnpm tsc --noEmit` and `pnpm lint` in CI to enforce type safety and linting.
+- Use `pnpm tsc --noEmit -p config/tsconfig.app.json` and `pnpm lint` in CI to enforce type safety and linting.
 - Snapshot or behavioural testing can be layered with tools such as Playwright or Vitest (not included by default).
 
 ## Deployment Checklist
@@ -106,4 +108,3 @@ Routing is provided by React Router (`src/App.tsx`), with left navigation groupe
 ---
 
 Maintained with 🪐 by the Exoplanet Ops team. Contributions, bug reports, and enhancement requests are welcome.
-

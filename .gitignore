@@ -25,5 +25,4 @@ dist-ssr
 
 .env
 
-tsconfig.node.tsbuildinfo
-vite.config.ts
+config/*.tsbuildinfo

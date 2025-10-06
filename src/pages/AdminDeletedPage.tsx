@@ -273,7 +273,7 @@ export default function AdminDeletedPage() {
             <input
               value={createForm.name}
               onChange={handleCreateChange("name")}
-              placeholder="Required"
+              placeholder="Kepler-451 b"
               style={inputControl}
               required
             />

@@ -14,7 +14,7 @@ const NAV_SECTIONS = [
     title: "Operations",
     items: [
       { to: "/diagnostics", label: "Diagnostics" },
-      { to: "/admin/deleted", label: "Admin" },
+      { to: "/admin", label: "Admin" },
     ],
   },
 ];

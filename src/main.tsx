@@ -36,7 +36,7 @@ const router = createHashRouter([
       { path: "planets", element: <PlanetsPage /> },
       { path: "visualization", element: <VisualizationPage /> },
       { path: "diagnostics", element: <DiagnosticsPage /> },
-      { path: "admin/deleted", element: <AdminDeletedPage /> },
+      { path: "admin", element: <AdminDeletedPage /> },
     ],
   },
 ]);
